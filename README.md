@@ -27,7 +27,7 @@ Match the color of your bullets with falling enemies to destroy them. Build comb
 ## Play
 
 Open the game here:  
-**[Play Cosmic Color](https://ahasanali9987.github.io/Cosmic-Color/)/)**
+**[Play Cosmic Color](https://ahasanali9987.github.io/Rocket-GK/)**
 
 ---
 
