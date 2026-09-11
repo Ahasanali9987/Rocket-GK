@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Cosmic Color</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    canvas { display: block; }
+    
+    #ui-layer {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      padding: 14px 16px;
+    }
+    
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      color: white;
+      text-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .galaxy-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      opacity: 0.9;
+    }
+    
+    .stats {
+      text-align: right;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    
+    .combo {
+      position: absolute;
+      top: 42%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 38px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 0 18px #ff0, 0 0 36px #f80;
+      opacity: 0;
+      transition: opacity 0.18s;
+      pointer-events: none;
+    }
+    
+    .power-text {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      color: #0ff;
+      text-shadow: 0 0 10px #0ff;
+      opacity: 0;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    
+    #start-screen, #game-over-screen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, #0a0a2e 0%, #000 75%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+      padding: 24px;
+      z-index: 20;
+    }
+    
+    h1 {
+      font-size: 34px;
+      margin-bottom: 6px;
+      background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle { opacity: 0.65; margin-bottom: 22px; font-size: 13px; }
+    
+    .btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border: none;
+      color: white;
+      padding: 13px 34px;
+      font-size: 17px;
+      border-radius: 50px;
+      cursor: pointer;
+      margin-top: 18px;
+      box-shadow: 0 0 22px rgba(102,126,234,0.45);
+      pointer-events: auto;
+      transition: transform 0.12s;
+    }
+    .btn:active { transform: scale(0.95); }
+    
+    .instructions {
+      max-width: 300px;
+      font-size: 13px;
+      line-height: 1.55;
+      opacity: 0.8;
+      margin-top: 18px;
+    }
+    
+    .boss-bar {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      max-width: 280px;
+      height: 8px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 4px;
+      overflow: hidden;
+      display: none;
+    }
+    .boss-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4757, #ff6b81);
+      width: 100%;
+      transition: width 0.15s;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  
+  <div id="ui-layer">
+    <div class="top-bar">
+      <div class="galaxy-name" id="galaxy">MILKY WAY</div>
+      <div class="stats">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div style="font-size:12px;opacity:0.65">Best: <span id="best">0</span></div>
+      </div>
+    </div>
+    <div class="boss-bar" id="bossBar"><div class="boss-bar-fill" id="bossFill"></div></div>
+  </div>
+  
+  <div class="combo" id="comboText"></div>
+  <div class="power-text" id="powerText"></div>
+  
+  <div id="start-screen">
+    <h1>COSMIC COLOR</h1>
+    <div class="subtitle">Match the color. Survive the galaxy.</div>
+    <div class="instructions">
+      Slide left / right to aim<br>
+      Bullets change color randomly<br>
+      <b>Only matching colors destroy enemies</b><br>
+      Build combos • Collect power-ups<br>
+      Defeat bosses every few levels
+    </div>
+    <button class="btn" id="launchBtn">LAUNCH</button>
+  </div>
+  
+  <div id="game-over-screen" style="display:none">
+    <h1>MISSION FAILED</h1>
+    <div style="font-size:21px;margin:14px 0">Score: <span id="finalScore">0</span></div>
+    <div style="opacity:0.65;font-size:14px">Best: <span id="finalBest">0</span></div>
+    <button class="btn" id="retryBtn">TRY AGAIN</button>
+  </div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W = window.innerWidth;
+let H = window.innerHeight;
+
+const COLORS = [
+  { main: '#FF4757', glow: '#FF6B81', name: 'red' },
+  { main: '#2E86DE', glow: '#54A0FF', name: 'blue' },
+  { main: '#1DD1A1', glow: '#55EFC4', name: 'green' },
+  { main: '#FECA57', glow: '#FFD32A', name: 'yellow' }
+];
+
+const GALAXIES = [
+  { name: "MILKY WAY",      bg: [8,8,28],   threshold: 0 },
+  { name: "CANIS MAJOR",    bg: [18,5,22],   threshold: 15 },
+  { name: "SAGITTARIUS",    bg: [22,8,5],    threshold: 35 },
+  { name: "URSA MINOR",     bg: [5,14,24],   threshold: 60 },
+  { name: "DRACO",          bg: [14,5,18],   threshold: 90 },
+  { name: "ANDROMEDA",      bg: [8,18,28],   threshold: 130 },
+  { name: "FINAL FRONTIER", bg: [25,8,35],   threshold: 180 }
+];
+
+// Audio context for procedural sounds
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, type, duration, volume = 0.08) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playShoot() {
+  playTone(420 + Math.random() * 80, 'square', 0.06, 0.04);
+}
+function playHit() {
+  playTone(180 + Math.random() * 60, 'sawtooth', 0.12, 0.07);
+}
+function playCombo() {
+  playTone(520, 'sine', 0.08, 0.06);
+  setTimeout(() => playTone(680, 'sine', 0.1, 0.05), 50);
+}
+function playPower() {
+  playTone(300, 'sine', 0.1, 0.06);
+  setTimeout(() => playTone(450, 'sine', 0.12, 0.05), 70);
+  setTimeout(() => playTone(600, 'sine', 0.15, 0.04), 140);
+}
+function playDamage() {
+  playTone(90, 'sawtooth', 0.25, 0.1);
+}
+function playBossHit() {
+  playTone(140, 'square', 0.15, 0.09);
+}
+
+// State
+let score = 0;
+let lives = 3;
+let level = 0;
+let gameActive = false;
+let combo = 0;
+let lastHitColor = -1;
+let screenShake = 0;
+let slowMo = 0;
+let multiShot = 0;
+let shield = 0;
+let highScore = 0;
+try { highScore = parseInt(localStorage.getItem('cosmicHigh') || '0'); } catch(e) {}
+
+const stars = [];
+const enemies = [];
+const bullets = [];
+const particles = [];
+const powerUps = [];
+const floatingTexts = [];
+
+let boss = null;
+let bossSpawned = false;
+
+const rocket = {
+  x: W / 2,
+  y: H - 90,
+  colorIndex: 0,
+  width: 38,
+  height: 54
+};
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  rocket.y = H - 90;
+}
+resize();
+window.addEventListener('resize', resize);
+document.getElementById('best').textContent = highScore;
+
+// ========== CLASSES ==========
+class Star {
+  constructor(layer = 1) {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.size = (Math.random() * 1.6 + 0.3) * layer;
+    this.speed = (0.25 + Math.random() * 0.7) * layer;
+    this.alpha = 0.25 + Math.random() * 0.7;
+    this.twinkle = Math.random() * Math.PI * 2;
+  }
+  update(dt) {
+    this.y += this.speed * dt * 60;
+    this.twinkle += 0.04;
+    if (this.y > H) { this.y = 0; this.x = Math.random() * W; }
+  }
+  draw() {
+    const a = this.alpha * (0.55 + 0.45 * Math.sin(this.twinkle));
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.fill();
+  }
+}
+
+class Enemy {
+  constructor(type = 'normal') {
+    this.type = type;
+    this.x = 35 + Math.random() * (W - 70);
+    this.y = -35;
+    this.colorIndex = Math.floor(Math.random() * 4);
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random() - 0.5) * 0.05;
+    
+    if (type === 'fast') {
+      this.radius = 12;
+      this.speed = 2.8 + level * 0.2;
+      this.hp = 1;
+    } else if (type === 'tough') {
+      this.radius = 22;
+      this.speed = 1.1 + level * 0.12;
+      this.hp = 3;
+    } else if (type === 'splitter') {
+      this.radius = 18;
+      this.speed = 1.5 + level * 0.15;
+      this.hp = 1;
+    } else {
+      this.radius = 15 + Math.random() * 5;
+      this.speed = 1.5 + level * 0.22 + Math.random() * 0.5;
+      this.hp = 1;
+    }
+  }
+  update(dt) {
+    const mul = slowMo > 0 ? 0.35 : 1;
+    this.y += this.speed * dt * 60 * mul;
+    this.rotation += this.rotSpeed;
+    return this.y < H + 50;
+  }
+  draw() {
+    const c = COLORS[this.colorIndex];
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    // glow
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 2.1);
+    g.addColorStop(0, c.glow + '77');
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // body
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = c.main;
+    ctx.fill();
+
+    // highlight
+    ctx.beginPath();
+    ctx.arc(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fill();
+
+    // type indicators
+    if (this.type === 'tough') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (this.type === 'fast') {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.moveTo(-6, 0); ctx.lineTo(0, -8); ctx.lineTo(6, 0);
+      ctx.fill();
+    }
+    if (this.type === 'splitter') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-this.radius * 0.6, 0);
+      ctx.lineTo(this.radius * 0.6, 0);
+      ctx.moveTo(0, -this.radius * 0.6);
+      ctx.lineTo(0, this.radius * 0.6);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+class Boss {
+  constructor() {
+    this.x = W / 2;
+    this.y = -80;
+    this.targetY = 120;
+    this.radius = 48;
+    this.colorIndex = Math.floor(Math.random() * 4);
+    this.hp = 18 + level * 4;
+    this.maxHp = this.hp;
+    this.phase = 0;
+    this.timer = 0;
+    this.vx = 1.8;
+    this.rotation = 0;
+  }
+  update(dt) {
+    this.timer += dt;
+    this.rotation += 0.015;
+    
+    // enter
+    if (this.y < this.targetY) {
+      this.y += 1.8 * dt * 60;
+      return true;
+    }
+    
+    // horizontal move
+    this.x += this.vx * dt * 60 * (slowMo > 0 ? 0.4 : 1);
+    if (this.x < 70 || this.x > W - 70) this.vx *= -1;
+    
+    // shoot pattern every 1.4s
+    if (this.timer > 1.4) {
+      this.timer = 0;
+      // spawn 3 mini enemies
+      for (let i = -1; i <= 1; i++) {
+        const e = new Enemy('fast');
+        e.x = this.x + i * 40;
+        e.y = this.y + 40;
+        e.colorIndex = this.colorIndex;
+        enemies.push(e);
+      }
+    }
+    return true;
+  }
+  draw() {
+    const c = COLORS[this.colorIndex];
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    // big glow
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 2.4);
+    g.addColorStop(0, c.glow + '99');
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // core
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = c.main;
+    ctx.fill();
+
+    // rings
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius + 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius + 18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-14, -8, 6, 0, Math.PI * 2);
+    ctx.arc(14, -8, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(-14, -8, 3, 0, Math.PI * 2);
+    ctx.arc(14, -8, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+class Bullet {
+  constructor(x, y, colorIndex, angle = -Math.PI / 2) {
+    this.x = x;
+    this.y = y;
+    this.colorIndex = colorIndex;
+    this.vx = Math.cos(angle) * 12;
+    this.vy = Math.sin(angle) * 12;
+    this.radius = 5;
+    this.trail = [];
+  }
+  update(dt) {
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 6) this.trail.shift();
+    this.x += this.vx * dt * 60;
+    this.y += this.vy * dt * 60;
+    return this.y > -30 && this.x > -30 && this.x < W + 30;
+  }
+  draw() {
+    const c = COLORS[this.colorIndex];
+    this.trail.forEach((p, i) => {
+      const a = (i + 1) / this.trail.length;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, this.radius * a * 0.75, 0, Math.PI * 2);
+      ctx.fillStyle = c.main + Math.floor(a * 160).toString(16).padStart(2, '0');
+      ctx.fill();
+    });
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = c.main;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+}
+
+class Particle {
+  constructor(x, y, color, speed = 1) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    const angle = Math.random() * Math.PI * 2;
+    const sp = (2 + Math.random() * 5.5) * speed;
+    this.vx = Math.cos(angle) * sp;
+    this.vy = Math.sin(angle) * sp;
+    this.life = 1;
+    this.decay = 0.014 + Math.random() * 0.02;
+    this.size = 2 + Math.random() * 4;
+  }
+  update(dt) {
+    this.x += this.vx * dt * 60;
+    this.y += this.vy * dt * 60;
+    this.vy += 0.07;
+    this.life -= this.decay;
+    return this.life > 0;
+  }
+  draw() {
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+class PowerUp {
+  constructor() {
+    this.x = 50 + Math.random() * (W - 100);
+    this.y = -25;
+    this.type = ['shield', 'slow', 'multi', 'life'][Math.floor(Math.random() * 4)];
+    this.radius = 13;
+    this.speed = 1.7;
+    this.pulse = 0;
+  }
+  update(dt) {
+    this.y += this.speed * dt * 60;
+    this.pulse += 0.09;
+    return this.y < H + 30;
+  }
+  draw() {
+    const map = { shield: '#00d2ff', slow: '#a29bfe', multi: '#fd79a8', life: '#00b894' };
+    const col = map[this.type];
+    const s = 1 + Math.sin(this.pulse) * 0.14;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(s, s);
+
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 26);
+    g.addColorStop(0, col + 'aa');
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const icons = { shield: 'S', slow: 'T', multi: 'M', life: '+' };
+    ctx.fillText(icons[this.type], 0, 1);
+    ctx.restore();
+  }
+}
+
+// ========== HELPERS ==========
+function spawnExplosion(x, y, color, count = 16) {
+  for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color, 1.1));
+  screenShake = Math.min(screenShake + 6, 14);
+}
+
+function showFloating(x, y, text, color = '#fff') {
+  floatingTexts.push({ x, y, text, color, life: 1, vy: -1.4 });
+}
+
+function showCombo(n) {
+  const el = document.getElementById('comboText');
+  el.textContent = n >= 6 ? n + 'x COMBO!' : n + 'x';
+  el.style.opacity = '1';
+  clearTimeout(window._ct);
+  window._ct = setTimeout(() => el.style.opacity = '0', 550);
+  playCombo();
+}
+
+function showPower(msg) {
+  const el = document.getElementById('powerText');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(window._pt);
+  window._pt = setTimeout(() => el.style.opacity = '0', 1400);
+  playPower();
+}
+
+function drawRocket() {
+  ctx.save();
+  ctx.translate(rocket.x, rocket.y);
+
+  // engine flame
+  const fl = 16 + Math.random() * 16;
+  const fg = ctx.createLinearGradient(0, 28, 0, 28 + fl);
+  fg.addColorStop(0, '#ff9f43');
+  fg.addColorStop(0.45, '#ee5a24');
+  fg.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.moveTo(-9, 30);
+  ctx.quadraticCurveTo(-3, 30 + fl * 1.3, 0, 32);
+  ctx.quadraticCurveTo(3, 30 + fl * 1.3, 9, 30);
+  ctx.fillStyle = fg;
+  ctx.fill();
+
+  // body
+  const bg = ctx.createLinearGradient(-18, 0, 18, 0);
+  bg.addColorStop(0, '#2d3436');
+  bg.addColorStop(0.5, '#636e72');
+  bg.addColorStop(1, '#2d3436');
+
+  ctx.beginPath();
+  ctx.moveTo(0, -26);
+  ctx.lineTo(-17, 28);
+  ctx.lineTo(-9, 34);
+  ctx.lineTo(9, 34);
+  ctx.lineTo(17, 28);
+  ctx.closePath();
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.strokeStyle = '#dfe6e9';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  // color stripe
+  const c = COLORS[rocket.colorIndex];
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.lineTo(-7, 18);
+  ctx.lineTo(7, 18);
+  ctx.closePath();
+  ctx.fillStyle = c.main;
+  ctx.fill();
+
+  // cockpit
+  ctx.beginPath();
+  ctx.arc(0, -4, 7, 0, Math.PI * 2);
+  ctx.fillStyle = '#74b9ff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-2, -6, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fill();
+
+  // fins
+  ctx.fillStyle = '#636e72';
+  ctx.beginPath();
+  ctx.moveTo(-15, 12);
+  ctx.lineTo(-26, 30);
+  ctx.lineTo(-12, 26);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(15, 12);
+  ctx.lineTo(26, 30);
+  ctx.lineTo(12, 26);
+  ctx.fill();
+
+  // shield
+  if (shield > 0) {
+    ctx.beginPath();
+    ctx.arc(0, 8, 36, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0,210,255,${0.35 + Math.sin(Date.now() / 140) * 0.25})`;
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawNebula() {
+  const g = GALAXIES[level];
+  ctx.fillStyle = `rgb(${g.bg[0]},${g.bg[1]},${g.bg[2]})`;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < 3; i++) {
+    const x = W * 0.2 + i * W * 0.3 + Math.sin(Date.now() / 4200 + i) * 35;
+    const y = H * 0.28 + Math.cos(Date.now() / 5100 + i) * 25;
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, 170);
+    grd.addColorStop(0, `rgba(${g.bg[0] + 35},${g.bg[1] + 18},${g.bg[2] + 45},0.11)`);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x - 170, y - 170, 340, 340);
+  }
+}
+
+// ========== GAME LOOP ==========
+let lastTime = 0;
+let spawnTimer = 0;
+let bulletTimer = 0;
+let powerTimer = 0;
+
+function gameLoop(ts) {
+  if (!gameActive) return;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05) || 0.016;
+  lastTime = ts;
+
+  if (slowMo > 0) slowMo -= dt;
+  if (multiShot > 0) multiShot -= dt;
+  if (shield > 0) shield -= dt;
+
+  ctx.save();
+  if (screenShake > 0) {
+    ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+    screenShake *= 0.88;
+  }
+
+  drawNebula();
+  stars.forEach(s => { s.update(dt); s.draw(); });
+
+  // Boss
+  if (boss) {
+    boss.update(dt);
+    boss.draw();
+    const pct = Math.max(0, boss.hp / boss.maxHp * 100);
+    document.getElementById('bossFill').style.width = pct + '%';
+  }
+
+  // Enemies
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (!enemies[i].update(dt)) {
+      enemies.splice(i, 1);
+      if (shield <= 0) {
+        lives--;
+        document.getElementById('lives').textContent = lives;
+        screenShake = 11;
+        playDamage();
+        if (lives <= 0) endGame();
+      } else {
+        showPower('SHIELD ABSORBED');
+      }
+    } else {
+      enemies[i].draw();
+    }
+  }
+
+  // Bullets + collisions
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    if (!bullets[i].update(dt)) {
+      bullets.splice(i, 1);
+      continue;
+    }
+    bullets[i].draw();
+
+    const b = bullets[i];
+    let hit = false;
+
+    // vs boss
+    if (boss && Math.hypot(b.x - boss.x, b.y - boss.y) < b.radius + boss.radius && b.colorIndex === boss.colorIndex) {
+      boss.hp--;
+      spawnExplosion(b.x, b.y, COLORS[b.colorIndex].main, 8);
+      playBossHit();
+      bullets.splice(i, 1);
+      hit = true;
+      if (boss.hp <= 0) {
+        spawnExplosion(boss.x, boss.y, COLORS[boss.colorIndex].main, 40);
+        score += 25;
+        document.getElementById('score').textContent = score;
+        showFloating(boss.x, boss.y, '+25', '#ffd700');
+        showPower('BOSS DEFEATED!');
+        boss = null;
+        document.getElementById('bossBar').style.display = 'none';
+        bossSpawned = false;
+      }
+    }
+
+    if (hit) continue;
+
+    // vs enemies
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      if (Math.hypot(b.x - e.x, b.y - e.y) < b.radius + e.radius && b.colorIndex === e.colorIndex) {
+        e.hp--;
+        if (e.hp <= 0) {
+          spawnExplosion(e.x, e.y, COLORS[e.colorIndex].main);
+          playHit();
+
+          // splitter
+          if (e.type === 'splitter') {
+            for (let k = 0; k < 2; k++) {
+              const child = new Enemy('fast');
+              child.x = e.x + (k === 0 ? -18 : 18);
+              child.y = e.y;
+              child.colorIndex = e.colorIndex;
+              enemies.push(child);
+            }
+          }
+
+          if (lastHitColor === e.colorIndex) combo++;
+          else { combo = 1; lastHitColor = e.colorIndex; }
+          if (combo >= 2) showCombo(combo);
+
+          const pts = 1 + Math.floor(combo / 2) + (e.type === 'tough' ? 2 : 0);
+          score += pts;
+          document.getElementById('score').textContent = score;
+          showFloating(e.x, e.y - 16, '+' + pts, COLORS[e.colorIndex].main);
+          enemies.splice(j, 1);
+        } else {
+          spawnExplosion(e.x, e.y, COLORS[e.colorIndex].main, 6);
+          playHit();
+        }
+        bullets.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  // Power-ups
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    const p = powerUps[i];
+    if (!p.update(dt)) { powerUps.splice(i, 1); continue; }
+    p.draw();
+    if (Math.hypot(p.x - rocket.x, p.y - rocket.y) < 38) {
+      if (p.type === 'shield') { shield = 7; showPower('SHIELD ACTIVE'); }
+      if (p.type === 'slow') { slowMo = 5.5; showPower('TIME SLOW'); }
+      if (p.type === 'multi') { multiShot = 6.5; showPower('MULTI-SHOT'); }
+      if (p.type === 'life') {
+        lives = Math.min(lives + 1, 8);
+        document.getElementById('lives').textContent = lives;
+        showPower('+1 LIFE');
+      }
+      spawnExplosion(p.x, p.y, '#fff', 10);
+      powerUps.splice(i, 1);
+    }
+  }
+
+  // Particles + floating text
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (!particles[i].update(dt)) particles.splice(i, 1);
+    else particles[i].draw();
+  }
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const t = floatingTexts[i];
+    t.y += t.vy;
+    t.life -= 0.018;
+    if (t.life <= 0) floatingTexts.splice(i, 1);
+    else {
+      ctx.globalAlpha = t.life;
+      ctx.fillStyle = t.color;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.text, t.x, t.y);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  drawRocket();
+  ctx.restore();
+
+  // Spawning
+  spawnTimer += dt;
+  const rate = Math.max(0.48, 1.05 - level * 0.07);
+  if (spawnTimer > rate && enemies.length < 7 + level && !boss) {
+    let type = 'normal';
+    const r = Math.random();
+    if (level >= 2 && r < 0.18) type = 'fast';
+    else if (level >= 3 && r < 0.32) type = 'tough';
+    else if (level >= 4 && r < 0.42) type = 'splitter';
+    enemies.push(new Enemy(type));
+    spawnTimer = 0;
+  }
+
+  bulletTimer += dt;
+  if (bulletTimer > 0.3) {
+    fireBullet();
+    bulletTimer = 0;
+  }
+
+  powerTimer += dt;
+  if (powerTimer > 8.5 + Math.random() * 5) {
+    powerUps.push(new PowerUp());
+    powerTimer = 0;
+  }
+
+  // Level / Boss
+  if (level < GALAXIES.length - 1 && score >= GALAXIES[level + 1].threshold) {
+    level++;
+    document.getElementById('galaxy').textContent = GALAXIES[level].name;
+    lives = Math.min(lives + 1, 7);
+    document.getElementById('lives').textContent = lives;
+    showPower('ENTERING ' + GALAXIES[level].name);
+    
+    // Boss every 2 levels starting from level 2
+    if (level >= 2 && level % 2 === 0 && !bossSpawned) {
+      boss = new Boss();
+      bossSpawned = true;
+      document.getElementById('bossBar').style.display = 'block';
+      showPower('⚠ BOSS INCOMING');
+    }
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+function fireBullet() {
+  rocket.colorIndex = Math.floor(Math.random() * 4);
+  bullets.push(new Bullet(rocket.x, rocket.y - 22, rocket.colorIndex));
+  playShoot();
+  if (multiShot > 0) {
+    bullets.push(new Bullet(rocket.x, rocket.y - 22, rocket.colorIndex, -Math.PI / 2 - 0.28));
+    bullets.push(new Bullet(rocket.x, rocket.y - 22, rocket.colorIndex, -Math.PI / 2 + 0.28));
+  }
+}
+
+function moveRocket(cx) {
+  rocket.x = Math.max(28, Math.min(W - 28, cx));
+}
+
+canvas.addEventListener('mousemove', e => moveRocket(e.clientX));
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  moveRocket(e.touches[0].clientX);
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  initAudio();
+  moveRocket(e.touches[0].clientX);
+}, { passive: false });
+
+function startGame() {
+  initAudio();
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game-over-screen').style.display = 'none';
+  document.getElementById('bossBar').style.display = 'none';
+  
+  gameActive = true;
+  score = 0;
+  lives = 3;
+  level = 0;
+  combo = 0;
+  lastHitColor = -1;
+  slowMo = multiShot = shield = screenShake = 0;
+  boss = null;
+  bossSpawned = false;
+  rocket.x = W / 2;
+  rocket.y = H - 90;
+  
+  enemies.length = 0;
+  bullets.length = 0;
+  particles.length = 0;
+  powerUps.length = 0;
+  floatingTexts.length = 0;
+  spawnTimer = bulletTimer = powerTimer = 0;
+
+  stars.length = 0;
+  for (let i = 0; i < 70; i++) stars.push(new Star(0.55));
+  for (let i = 0; i < 45; i++) stars.push(new Star(1.15));
+
+  document.getElementById('score').textContent = '0';
+  document.getElementById('lives').textContent = '3';
+  document.getElementById('galaxy').textContent = GALAXIES[0].name;
+
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  gameActive = false;
+  if (score > highScore) {
+    highScore = score;
+    try { localStorage.setItem('cosmicHigh', highScore); } catch(e) {}
+  }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('finalBest').textContent = highScore;
+  document.getElementById('game-over-screen').style.display = 'flex';
+  document.getElementById('bossBar').style.display = 'none';
+}
+
+document.getElementById('launchBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', () => location.reload());
+
+// initial stars
+for (let i = 0; i < 35; i++) stars.push(new Star(1));
+</script>
+</body>
+</html>
