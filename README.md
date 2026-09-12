@@ -1,4 +1,4 @@
-# Cosmic Color
+# Spaceship Shooter
 
 A fast-paced color-matching space shooter.
 
@@ -27,7 +27,7 @@ Match the color of your bullets with falling enemies to destroy them. Build comb
 ## Play
 
 Open the game here:  
-**[Play Cosmic Color](https://ahasanali9987.github.io/Rocket-GK/)**
+**[Play Spaceship Shooter](https://ahasanali9987.github.io/Rocket-GK/)**
 
 ---
 
