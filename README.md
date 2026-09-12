@@ -27,7 +27,7 @@ Match the color of your bullets with falling enemies to destroy them. Build comb
 ## Play
 
 Open the game here:  
-**[Play Spaceship Shooter](https://ahasanali9987.github.io/Rocket-GK/)**
+**[Spaceship Shooter](https://ahasanali9987.github.io/Rocket-GK/)**
 
 ---
 
